@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  cosmos-emul:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+    container_name: cosmos-emul
+    restart: unless-stopped
+    command: ["--protocol", "https"] # IMPORTANT: HTTPS so the cert endpoint exists
+    ports:
+      - "8081:8081" # gateway (HTTPS)
+      - "1234:1234" # Data Explorer UI
+    volumes:
+      # Put the data outside your repo (adjust the path as you like)
+      - type: bind
+        source: "C:\\cosmos-emulator-data"
+        target: /data
