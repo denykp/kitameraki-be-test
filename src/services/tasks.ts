@@ -13,21 +13,28 @@ export async function GetTasks(
 
   try {
     const container = await getTasksContainer();
-    const orgId = request.headers.get("organizationId");
+    const orgId = request.query.get("organizationId");
     if (!orgId)
       return { status: 400, jsonBody: { error: "Missing organizationId" } };
+    const status = request.query.get("status");
+    context.log("status", status);
+    const search = request.query.get("search");
+    context.log("status", status, String(status || "all").toLowerCase());
 
     const res = await container.items
       .query({
-        query: `SELECT * FROM c where c.organizationId = @organizationId`,
-        parameters: [{ name: "@organizationId", value: orgId }],
+        query: `SELECT c.id, c.title, c.status FROM c where c.organizationId = @organizationId and (lower(c.status) = lower(@status) or lower(@status) = 'all') and contains(c.title,@search,true)`,
+        parameters: [
+          { name: "@organizationId", value: orgId },
+          { name: "@status", value: String(status || "all") },
+          { name: "@search", value: search },
+        ],
       })
       .fetchNext();
 
     return {
       jsonBody: {
         data: res.resources,
-        meta: { count: res.resources.length },
       },
       status: 200,
     };
@@ -47,7 +54,7 @@ export async function InsertTask(
   context.log(`Http function processed request for url "${request.url}"`);
 
   try {
-    const orgId = request.headers.get("organizationId");
+    const orgId = request.query.get("organizationId");
     if (!orgId)
       return { status: 400, jsonBody: { error: "Missing organizationId" } };
 
@@ -79,7 +86,7 @@ export async function UpdateTask(
     const body = (await request.json()) as object;
     const taskId = request.params.id;
     context.log("taskId", taskId);
-    const orgId = request.headers.get("organizationId");
+    const orgId = request.query.get("organizationId");
     if (!orgId)
       return { status: 400, jsonBody: { error: "Missing organizationId" } };
 
@@ -121,7 +128,7 @@ export async function GetTask(
   try {
     const taskId = request.params.id;
     const container = await getTasksContainer();
-    const orgId = request.headers.get("organizationId");
+    const orgId = request.query.get("organizationId");
     if (!orgId)
       return { status: 400, jsonBody: { error: "Missing organizationId" } };
 
@@ -154,7 +161,7 @@ export async function DeleteTask(
   try {
     const taskId = request.params.id;
     const container = await getTasksContainer();
-    const orgId = request.headers.get("organizationId");
+    const orgId = request.query.get("organizationId");
     if (!orgId)
       return { status: 400, jsonBody: { error: "Missing organizationId" } };
 
@@ -184,7 +191,7 @@ export async function BulkDeleteTasks(
   try {
     const body = (await request.json()) as string[];
     const container = await getTasksContainer();
-    const orgId = request.headers.get("organizationId");
+    const orgId = request.query.get("organizationId");
     if (!orgId)
       return { status: 400, jsonBody: { error: "Missing organizationId" } };
 
@@ -192,7 +199,7 @@ export async function BulkDeleteTasks(
       await container.item(element, orgId).delete();
     });
 
-    return { status: 200 };
+    return { status: 200, jsonBody: { message: "Tasks deleted successfully" } };
   } catch (error) {
     context.error("BulkDeleteTasks failed:", error);
     return {
