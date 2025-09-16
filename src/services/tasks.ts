@@ -17,24 +17,47 @@ export async function GetTasks(
     if (!orgId)
       return { status: 400, jsonBody: { error: "Missing organizationId" } };
     const status = request.query.get("status");
-    context.log("status", status);
     const search = request.query.get("search");
-    context.log("status", status, String(status || "all").toLowerCase());
+
+    const page = Number(request.query.get("page") || 1);
+    const pageSize = Number(request.query.get("pageSize") || 10);
+
+    const baseQuery = `SELECT c.id, c.title, c.status FROM c where c.organizationId = @organizationId 
+      and (lower(c.status) = lower(@status) or lower(@status) = 'all') and contains(c.title,@search,true)`;
+    const baseParams = [
+      { name: "@organizationId", value: orgId },
+      { name: "@status", value: String(status || "all") },
+      { name: "@search", value: search },
+    ];
 
     const res = await container.items
       .query({
-        query: `SELECT c.id, c.title, c.status FROM c where c.organizationId = @organizationId and (lower(c.status) = lower(@status) or lower(@status) = 'all') and contains(c.title,@search,true)`,
+        query: `${baseQuery} offset @offset limit @limit`,
         parameters: [
-          { name: "@organizationId", value: orgId },
-          { name: "@status", value: String(status || "all") },
-          { name: "@search", value: search },
+          ...baseParams,
+          { name: "@offset", value: pageSize * (page - 1) },
+          { name: "@limit", value: pageSize },
         ],
       })
       .fetchNext();
 
+    const totalRes = await container.items
+      .query({
+        query: `${baseQuery}`,
+        parameters: baseParams,
+      })
+      .fetchAll();
+
     return {
       jsonBody: {
         data: res.resources,
+        meta: {
+          pagination: {
+            page,
+            pageSize,
+            total: totalRes.resources.length,
+          },
+        },
       },
       status: 200,
     };
